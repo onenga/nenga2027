@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ひつじの柵越えジャンプ</title>
+    <!-- Tailwind CSS for sleek UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            max-width: 480px;
+            height: 100vh;
+            max-height: 854px;
+            background: #87CEEB;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            color: #1e293b;
+            font-weight: 700;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+            z-index: 5;
+        }
+        .center-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            padding: 28px 24px;
+            border-radius: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            width: 88%;
+            max-width: 340px;
+            z-index: 20;
+            border: 2px solid rgba(255, 255, 255, 0.6);
+        }
+        .center-screen.hidden {
+            display: none !important;
+        }
+        .btn {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 1.15rem;
+            font-weight: 800;
+            border-radius: 9999px;
+            cursor: pointer;
+            box-shadow: 0 10px 15px -3px rgba(234, 88, 12, 0.4);
+            margin-top: 18px;
+            pointer-events: auto;
+            transition: all 0.15s ease-in-out;
+            width: 100%;
+        }
+        .btn:active {
+            transform: scale(0.96);
+            box-shadow: 0 4px 6px -1px rgba(234, 88, 12, 0.4);
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- プレイ中HUD -->
+    <div id="hud" class="ui-layer hidden">
+        <div class="flex justify-between items-center text-lg bg-white/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/50">
+            <div>スコア: <span id="currentScore" class="text-orange-600 text-xl font-extrabold">0</span> 匹</div>
+            <div>自己ベスト: <span id="localBest" class="text-slate-800 font-extrabold">0</span> 匹</div>
+        </div>
+    </div>
+
+    <!-- スタート画面 -->
+    <div id="startScreen" class="center-screen">
+        <div class="text-3xl mb-2">🐑</div>
+        <h1 class="text-xl font-extrabold text-slate-800 mb-2 leading-tight">未年だよ！<br>ひつじの柵越えジャンプ</h1>
+        <div class="bg-amber-50 p-3 rounded-xl border border-amber-200 text-left mb-4 text-xs text-slate-600 space-y-1">
+            <p class="font-bold text-amber-900 mb-1">🎮 操作方法:</p>
+            <p>・ ちょんとタップ ➔ <span class="font-bold text-amber-800">小ジャンプ</span></p>
+            <p>・ 長押し ➔ <span class="font-bold text-amber-800">大ジャンプ</span>（高い柵を跳び越えよう！）</p>
+        </div>
+        <button class="btn" id="startBtn">ゲームスタート</button>
+    </div>
+
+    <!-- ゲームオーバー画面 -->
+    <div id="gameOverScreen" class="center-screen hidden">
+        <h1 class="text-2xl font-black text-rose-600 mb-3">ゲームオーバー</h1>
+        
+        <div class="space-y-2 text-sm text-slate-600 mb-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+            <div class="flex justify-between items-center">
+                <span>今回のスコア:</span>
+                <span id="finalScore" class="font-extrabold text-orange-600 text-lg">0 匹</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span>あなたのハイスコア:</span>
+                <span id="finalBest" class="font-extrabold text-slate-800 text-base">0 匹</span>
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-slate-200">
+                <span class="flex items-center gap-1">🌐 全体のハイスコア:</span>
+                <span id="globalHigh" class="font-extrabold text-emerald-600 text-base">取得中...</span>
+            </div>
+        </div>
+
+        <button class="btn" id="retryBtn">もう一度遊ぶ</button>
+    </div>
+</div>
+
+<script>
+// Google Apps Script (GAS) Web Apps URL
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzOJWfUvgZYi1p94EisOjNxbvawc9_qCWl8MT8Q2fiifUXYE1lkh4LIqjTJO3byzD43kA/exec";
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const VIEW_WIDTH = 480;
+const VIEW_HEIGHT = 854;
+canvas.width = VIEW_WIDTH;
+canvas.height = VIEW_HEIGHT;
+
+let gameState = 'START';
+let score = 0;
+let localBest = parseInt(localStorage.getItem('sheep_local_best')) || 0;
+let globalHigh = "---";
+
+// 浮遊スコアポップアップ管理用配列
+let popups = [];
+
+// 【GAS機能1】全体のハイスコアを取得
+async function fetchGlobalScore() {
+    if (!GAS_URL || GAS_URL.includes("ここにコピーした")) return;
+    try {
+        const response = await fetch(GAS_URL);
+        const data = await response.json();
+        if (data.status === 'success') {
+            globalHigh = data.globalHigh;
+            document.getElementById('globalHigh').textContent = globalHigh + ' 匹';
+        }
+    } catch (e) {
+        console.error("全体ハイスコア取得エラー:", e);
+    }
+}
+
+// 【GAS機能2】スコアを送信して最新の全体ハイスコアを同期
+async function postGlobalScore(playerScore) {
+    if (!GAS_URL || GAS_URL.includes("ここにコピーした")) return;
+    try {
+        const response = await fetch(GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify({ score: playerScore })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            globalHigh = data.globalHigh;
+            document.getElementById('globalHigh').textContent = globalHigh + ' 匹';
+        }
+    } catch (e) {
+        console.error("全体ハイスコア送信エラー:", e);
+    }
+}
+
+// ひつじオブジェクト定義（物理パラメーター適用）
+const sheep = {
+    x: 80,
+    y: VIEW_HEIGHT - 220,
+    width: 60,
+    height: 50,
+    vy: 0,
+    gravity: 0.65,
+    jumpPower: -9,       // 初期ジャンプ力
+    holdBoost: -0.45,    // 長押し上昇ブースト
+    maxHoldFrames: 15,   // 最大ブースト維持フレーム数
+    isJumping: false,
+    isHolding: false,
+    holdCounter: 0,
+
+    draw() {
+        ctx.save();
+        // ひつじのボディ（ふわふわ感の表現）
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(this.x + 30, this.y + 25, 22, 0, Math.PI * 2);
+        ctx.arc(this.x + 15, this.y + 20, 15, 0, Math.PI * 2);
+        ctx.arc(this.x + 45, this.y + 20, 15, 0, Math.PI * 2);
+        ctx.arc(this.x + 25, this.y + 12, 14, 0, Math.PI * 2);
+        ctx.arc(this.x + 38, this.y + 12, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 顔と耳
+        ctx.fillStyle = '#333333';
+        ctx.beginPath();
+        ctx.roundRect(this.x + 35, this.y + 12, 20, 24, 6);
+        ctx.fill();
+
+        // 目
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(this.x + 48, this.y + 20, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 足
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(this.x + 18, this.y + 40, 6, 18);
+        ctx.fillRect(this.x + 38, this.y + 40, 6, 18);
+
+        ctx.restore();
+    }
+};
+
+let fences = [];
+let fenceTimer = 0;
+let nextFenceInterval = 90;
+let gameSpeed = 5;
+
+// 指定された計算式に基づく出現間隔の更新
+function setNextFenceInterval() {
+    const maxInterval = Math.max(90 - Math.floor(score * 0.3), 70);
+    const minInterval = Math.max(40 - Math.floor(score * 0.2), 35);
+    nextFenceInterval = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
+}
+
+// スコア10匹ごとの空の色（ステージ推移：青空 ➔ 夕暮れ ➔ 夜空 ➔ 朝焼け）
+function getSkyColor(progress) {
+    let stage = Math.floor(progress / 10) % 4;
+    if (stage === 0) return '#87CEEB'; // 青空
+    else if (stage === 1) return '#FFA07A'; // 夕暮れ
+    else if (stage === 2) return '#191970'; // 夜空
+    else return '#FFDAB9'; // 朝焼け
+}
+
+function handleTouchStart(e) {
+    if (gameState === 'PLAYING') {
+        const groundY = VIEW_HEIGHT - 170;
+        if (sheep.y >= groundY - sheep.height - 2) {
+            sheep.vy = sheep.jumpPower;
+            sheep.isJumping = true;
+            sheep.isHolding = true;
+            sheep.holdCounter = 0;
+        }
+    }
+}
+
+function handleTouchEnd(e) {
+    if (gameState === 'PLAYING') {
+        sheep.isHolding = false;
+    }
+}
+
+window.addEventListener('pointerdown', handleTouchStart);
+window.addEventListener('pointerup', handleTouchEnd);
+window.addEventListener('pointercancel', handleTouchEnd);
+
+function startGame(e) {
+    if (e) {
+        e.stopPropagation();
+    }
+    gameState = 'PLAYING';
+    score = 0;
+    fences = [];
+    popups = [];
+    fenceTimer = 0;
+    gameSpeed = 5;
+    sheep.y = VIEW_HEIGHT - 220;
+    sheep.vy = 0;
+    sheep.isJumping = false;
+    sheep.isHolding = false;
+
+    setNextFenceInterval();
+
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('gameOverScreen').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    document.getElementById('currentScore').textContent = score;
+    document.getElementById('localBest').textContent = localBest;
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', startGame);
+document.getElementById('startBtn').addEventListener('pointerdown', (e) => e.stopPropagation());
+document.getElementById('retryBtn').addEventListener('pointerdown', (e) => e.stopPropagation());
+
+function spawnFence() {
+    const isHigh = Math.random() < 0.45;
+    let height = isHigh ? 80 : 45;
+
+    fences.push({
+        x: VIEW_WIDTH,
+        y: VIEW_HEIGHT - 170 - height,
+        width: 25,
+        height: height,
+        passed: false
+    });
+}
+
+function update() {
+    if (gameState === 'PLAYING') {
+        // 長押し時のホールドブースト処理
+        if (sheep.isHolding && sheep.isJumping && sheep.holdCounter < sheep.maxHoldFrames) {
+            sheep.vy += sheep.holdBoost;
+            sheep.holdCounter++;
+        }
+
+        sheep.vy += sheep.gravity;
+        sheep.y += sheep.vy;
+
+        // 接地判定
+        const groundY = VIEW_HEIGHT - 170;
+        if (sheep.y > groundY - sheep.height) {
+            sheep.y = groundY - sheep.height;
+            sheep.vy = 0;
+            sheep.isJumping = false;
+            sheep.isHolding = false;
+        }
+
+        // 柵の自動生成
+        fenceTimer++;
+        if (fenceTimer >= nextFenceInterval) {
+            spawnFence();
+            fenceTimer = 0;
+            setNextFenceInterval();
+            if (gameSpeed < 8.5) gameSpeed += 0.08;
+        }
+
+        // 柵の移動・通過・衝突判定
+        for (let i = fences.length - 1; i >= 0; i--) {
+            fences[i].x -= gameSpeed;
+
+            // スコアカウント＆ポップアップ出現
+            if (!fences[i].passed && fences[i].x < sheep.x) {
+                fences[i].passed = true;
+                score++;
+                document.getElementById('currentScore').textContent = score;
+
+                popups.push({
+                    x: sheep.x + 20,
+                    y: sheep.y - 12,
+                    text: "+1",
+                    alpha: 1.0,
+                    vy: -1.5
+                });
+            }
+
+            // 衝突判定 (AABB)
+            if (
+                sheep.x < fences[i].x + fences[i].width &&
+                sheep.x + sheep.width > fences[i].x &&
+                sheep.y < fences[i].y + fences[i].height &&
+                sheep.y + sheep.height > fences[i].y
+            ) {
+                gameOver();
+            }
+
+            if (fences[i].x < -50) {
+                fences.splice(i, 1);
+            }
+        }
+
+        // スコアポップアップのアニメーション処理
+        for (let i = popups.length - 1; i >= 0; i--) {
+            popups[i].y += popups[i].vy;
+            popups[i].alpha -= 0.03;
+            if (popups[i].alpha <= 0) {
+                popups.splice(i, 1);
+            }
+        }
+    }
+}
+
+function gameOver() {
+    gameState = 'GAMEOVER';
+    document.getElementById('hud').classList.add('hidden');
+
+    if (score > localBest) {
+        localBest = score;
+        localStorage.setItem('sheep_local_best', localBest);
+    }
+
+    document.getElementById('localBest').textContent = localBest;
+    document.getElementById('finalScore').textContent = score + ' 匹';
+    document.getElementById('finalBest').textContent = localBest + ' 匹';
+    document.getElementById('gameOverScreen').classList.remove('hidden');
+
+    // GASクラウド同期へスコア送信
+    postGlobalScore(score);
+}
+
+function draw() {
+    // 空描画
+    ctx.fillStyle = getSkyColor(score);
+    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+    // 夜空ステージ時は月、それ以外は太陽
+    let currentStage = Math.floor(score / 10) % 4;
+    ctx.fillStyle = (currentStage === 2) ? '#F5F5F5' : '#FFD700';
+    ctx.beginPath();
+    ctx.arc(VIEW_WIDTH - 70, 90, 35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 遠くの山々
+    ctx.fillStyle = '#5c8a8a';
+    ctx.beginPath();
+    ctx.moveTo(0, VIEW_HEIGHT - 170);
+    ctx.lineTo(150, VIEW_HEIGHT - 320);
+    ctx.lineTo(320, VIEW_HEIGHT - 170);
+    ctx.lineTo(480, VIEW_HEIGHT - 250);
+    ctx.lineTo(480, VIEW_HEIGHT - 170);
+    ctx.fill();
+
+    // 地面（手前と奥のグラデーション）
+    ctx.fillStyle = '#7CB342';
+    ctx.fillRect(0, VIEW_HEIGHT - 170, VIEW_WIDTH, 170);
+
+    ctx.fillStyle = '#558B2F';
+    ctx.fillRect(0, VIEW_HEIGHT - 150, VIEW_WIDTH, 150);
+
+    // 柵描画
+    fences.forEach(fence => {
+        ctx.fillStyle = '#8D6E63';
+        ctx.fillRect(fence.x, fence.y, fence.width, fence.height);
+
+        ctx.fillStyle = '#5D4037';
+        ctx.fillRect(fence.x - 3, fence.y + 8, fence.width + 6, 5);
+        if (fence.height > 60) {
+            ctx.fillRect(fence.x - 3, fence.y + 35, fence.width + 6, 5);
+        }
+        ctx.fillRect(fence.x - 3, fence.y + fence.height - 12, fence.width + 6, 5);
+    });
+
+    // ひつじ描画
+    sheep.draw();
+
+    // ポップアップ描画
+    popups.forEach(p => {
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = '#ea580c';
+        ctx.font = 'black 26px sans-serif';
+        ctx.fillText(p.text, p.x, p.y);
+        ctx.restore();
+    });
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+// 初期化と起動
+document.getElementById('localBest').textContent = localBest;
+fetchGlobalScore();
+loop();
+</script>
+
+</body>
+</html>
