@@ -434,7 +434,7 @@ function draw() {
 
     // 夜空ステージ時は月、それ以外は太陽
     let currentStage = Math.floor(score / 10) % 4;
-    ctx.fillStyle = (currentStage === 2) ? '#F5F5F5' : '#FFD700';
+    ctx.fillStyle = (currentStage === 2) ? '#FAEE4B' : '#FFD700';
     ctx.beginPath();
     ctx.arc(VIEW_WIDTH - 70, 90, 35, 0, Math.PI * 2);
     ctx.fill();
